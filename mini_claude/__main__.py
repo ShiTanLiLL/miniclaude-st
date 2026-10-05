@@ -5,7 +5,7 @@
 第 4 课起，你的输入在进循环前会先过一轮 UserPromptSubmit 钩子。
 """
 
-from . import llm
+from . import llm, subagent
 from .hooks import trigger_hooks
 from .loop import agent_loop
 
@@ -38,6 +38,7 @@ def main() -> None:
         if client is None:
             client = llm.get_client()
             model = llm.get_model()
+            subagent.bind(client, model)   # 子代理复用同一条 API 连接
 
         trigger_hooks("UserPromptSubmit", query)
         history.append({"role": "user", "content": query})

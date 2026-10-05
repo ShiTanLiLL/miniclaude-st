@@ -30,6 +30,25 @@ def trigger_hooks(event: str, *args):
     return None
 
 
+def execute_tool(block, handlers: dict) -> str:
+    """一次工具调用的标准流程：过闸 -> 执行（异常兜底）-> 旁观。
+
+    第 6 课从循环里抽出来：主代理和子代理共用同一套执行规矩。
+    """
+    blocked = trigger_hooks("PreToolUse", block)
+    if blocked:
+        return str(blocked)
+
+    handler = handlers.get(block.name)
+    try:
+        output = handler(**block.input) if handler else f"Unknown: {block.name}"
+    except Exception as e:
+        output = f"Error: {e}"
+
+    trigger_hooks("PostToolUse", block, output)
+    return str(output)
+
+
 def permission_hook(block):
     """PreToolUse：第 3 课的三道闸搬到这里（规则本身仍在 permission.py，不复制）。"""
     if block.name == "bash":

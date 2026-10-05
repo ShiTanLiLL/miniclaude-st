@@ -4,11 +4,13 @@
 第 2 课：工具搬进 tools.py，循环改成查 TOOL_HANDLERS 分发。
 第 3 课：执行工具前先过 check_permission 三道闸。
 第 4 课：三道闸改造成 PreToolUse 钩子，循环只认 trigger_hooks。
-第 5 课：todo_write 计划清单 + 3 轮未更新注入 <reminder>；
-        handler 抛异常不再炸循环，错误变成 tool_result。
+第 5 课：todo_write 计划清单 + 3 轮未更新注入 <reminder>。
+第 6 课：task 工具接入子代理（独立 messages），工具执行抽成
+        hooks.execute_tool 供主/子代理共用。
 """
 
-from .hooks import trigger_hooks
+from .hooks import execute_tool, trigger_hooks
+from .subagent import TASK_TOOL, run_subagent
 from .tools import TOOLS, TOOL_HANDLERS, WORKDIR
 
 REMINDER_ROUNDS = 3
@@ -18,8 +20,13 @@ SYSTEM = (
     "Use the available tools to solve tasks. Act, don't explain. "
     "All destructive operations require user approval. "
     "Before starting any multi-step task, use todo_write to plan your steps. "
-    "Update status as you go."
+    "Update status as you go. "
+    "Use task for focused exploration or a self-contained subtask."
 )
+
+# 父代理的工具池 = 基础工具 + task。子代理只用基础池，拿不到 task（防套娃）。
+PARENT_TOOLS = [*TOOLS, TASK_TOOL]
+PARENT_HANDLERS = {**TOOL_HANDLERS, "task": run_subagent}
 
 
 def agent_loop(messages: list, client, model: str) -> None:
@@ -32,7 +39,7 @@ def agent_loop(messages: list, client, model: str) -> None:
     while True:
         response = client.messages.create(
             model=model, system=SYSTEM, messages=messages,
-            tools=TOOLS, max_tokens=8000,
+            tools=PARENT_TOOLS, max_tokens=8000,
         )
 
         # 1) 先把模型的回复原样记进历史
@@ -51,27 +58,13 @@ def agent_loop(messages: list, client, model: str) -> None:
             return
 
         # 3) 过闸改走钩子：PreToolUse 拦截 -> 查表执行 -> PostToolUse 旁观
+        #    （过闸/执行/旁观都在 hooks.execute_tool 里，第 6 课起主/子代理共用）
         results = []
         used_todo = False
         for block in tool_calls:
             print(f"\033[36m> {block.name}\033[0m")
-            blocked = trigger_hooks("PreToolUse", block)
-            if blocked:
-                results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": str(blocked),
-                })
-                continue
-            handler = TOOL_HANDLERS.get(block.name)
-            try:
-                # 第 5 课：工具内部抛异常不再炸整个循环，错误变成模型的反馈
-                output = handler(**block.input) if handler else f"Unknown: {block.name}"
-            except Exception as e:
-                output = f"Error: {e}"
+            output = execute_tool(block, PARENT_HANDLERS)
             print(str(output)[:200])
-
-            trigger_hooks("PostToolUse", block, output)
 
             if block.name == "todo_write":
                 used_todo = True
