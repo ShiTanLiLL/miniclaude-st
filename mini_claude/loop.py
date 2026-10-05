@@ -10,19 +10,28 @@
 """
 
 from .hooks import execute_tool, trigger_hooks
+from .skills import LOADER
 from .subagent import TASK_TOOL, run_subagent
 from .tools import TOOLS, TOOL_HANDLERS, WORKDIR
 
 REMINDER_ROUNDS = 3
 
-SYSTEM = (
-    f"You are a coding agent. Workspace: {WORKDIR}. "
-    "Use the available tools to solve tasks. Act, don't explain. "
-    "All destructive operations require user approval. "
-    "Before starting any multi-step task, use todo_write to plan your steps. "
-    "Update status as you go. "
-    "Use task for focused exploration or a self-contained subtask."
-)
+
+def build_system_prompt() -> str:
+    """组装 system prompt：岗位说明 + 技能目录（目录常驻，正文按需）。"""
+    return (
+        f"You are a coding agent. Workspace: {WORKDIR}. "
+        "Use the available tools to solve tasks. Act, don't explain. "
+        "All destructive operations require user approval. "
+        "Before starting any multi-step task, use todo_write to plan your steps. "
+        "Update status as you go. "
+        "Use task for focused exploration or a self-contained subtask.\n\n"
+        f"Skills available:\n{LOADER.catalog()}\n\n"
+        "Use load_skill to read the full instructions when a skill applies."
+    )
+
+
+SYSTEM = build_system_prompt()
 
 # 父代理的工具池 = 基础工具 + task。子代理只用基础池，拿不到 task（防套娃）。
 PARENT_TOOLS = [*TOOLS, TASK_TOOL]
