@@ -3,6 +3,9 @@
 不联网、不花钱：把模型要说的每一步提前写成剧本（一串假响应），
 FakeClient 按顺序吐出来，agent_loop 就能被 pytest 完整驱动。
 这招学自原项目 tests/ 的做法，后面每一课的测试都靠它。
+
+第 2 课升级：tool_response 支持任意工具（不再只有 bash），
+并拆出 tool_block 方便在一条回复里塞多张调用单。
 """
 
 from types import SimpleNamespace
@@ -15,16 +18,16 @@ def text_response(text: str):
     )
 
 
-def tool_response(command: str, tool_use_id: str = "tool-1"):
-    """构造一个"要调用 bash 工具"的模型回复。"""
+def tool_block(name: str, arguments: dict, tool_use_id: str = "tool-1"):
+    """构造一张工具调用单（一条回复里可以有很多张）。"""
     return SimpleNamespace(
-        content=[
-            SimpleNamespace(
-                type="tool_use", id=tool_use_id,
-                name="bash", input={"command": command},
-            )
-        ]
+        type="tool_use", id=tool_use_id, name=name, input=arguments,
     )
+
+
+def tool_response(name: str, arguments: dict, tool_use_id: str = "tool-1"):
+    """构造一个"恰好要调用一个工具"的模型回复。"""
+    return SimpleNamespace(content=[tool_block(name, arguments, tool_use_id)])
 
 
 class FakeMessages:

@@ -1,5 +1,6 @@
 """mini_claude —— 逐课复现 learn-claude-code 的迷你 Agent Harness。
 
-第 1 课：只有一个 bash 工具的 Agent Loop。
-后面的每一课，都是在这个包里"长"出新的机制。
+当前能力（第 2 课后）：
+- Agent Loop：模型决定何时用工具、何时停手
+- 五件套工具：bash / read_file / write_file / edit_file / glob，查表分发
 """

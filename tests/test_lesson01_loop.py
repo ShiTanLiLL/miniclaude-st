@@ -6,7 +6,8 @@
 """
 
 from fakes import FakeClient, text_response, tool_response
-from mini_claude.loop import agent_loop, run_bash
+from mini_claude.loop import agent_loop
+from mini_claude.tools import run_bash
 
 
 def test_text_only_stops_immediately():
@@ -24,7 +25,7 @@ def test_text_only_stops_immediately():
 def test_bash_tool_roundtrip():
     """完整一圈：要工具 -> 执行 -> tool_result 回填 -> 模型总结收工。"""
     client = FakeClient([
-        tool_response("echo hello-agent"),
+        tool_response("bash", {"command": "echo hello-agent"}),
         text_response("命令输出是 hello-agent"),
     ])
     messages = [{"role": "user", "content": "跑一下 echo"}]
@@ -44,7 +45,7 @@ def test_bash_tool_roundtrip():
 def test_dangerous_command_blocked():
     """危险命令不会真的执行，拦截信息作为 tool_result 交回模型。"""
     client = FakeClient([
-        tool_response("rm -rf /"),
+        tool_response("bash", {"command": "rm -rf /"}),
         text_response("好吧，那我换个安全的方式"),
     ])
     messages = [{"role": "user", "content": "删库跑路"}]
