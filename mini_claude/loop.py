@@ -2,10 +2,12 @@
 
 第 1 课：一个 bash 工具，循环里硬编码调用 run_bash。
 第 2 课：工具搬进 tools.py，循环改成查 TOOL_HANDLERS 分发。
-第 3 课：执行工具前先过 check_permission 三道闸——循环里只加了一个 if。
+第 3 课：执行工具前先过 check_permission 三道闸。
+第 4 课：三道闸改造成 PreToolUse 钩子，循环只认 trigger_hooks，
+        并多出 UserPromptSubmit / PostToolUse / Stop 三个扩展点。
 """
 
-from .permission import check_permission
+from .hooks import trigger_hooks
 from .tools import TOOLS, TOOL_HANDLERS, WORKDIR
 
 SYSTEM = (
@@ -16,7 +18,7 @@ SYSTEM = (
 
 
 def agent_loop(messages: list, client, model: str) -> None:
-    """驱动对话，直到模型不再请求任何工具。
+    """驱动对话，直到模型不再请求任何工具（且 Stop 钩子不反对）。
 
     messages 是"聊天记录本"，会被就地 append 增长，
     所以调用方（REPL）跨多轮提问时能保留完整历史。
@@ -30,27 +32,36 @@ def agent_loop(messages: list, client, model: str) -> None:
         # 1) 先把模型的回复原样记进历史
         messages.append({"role": "assistant", "content": response.content})
 
-        # 2) 从回复里挑出工具调用单；一张都没有 => 模型收工
+        # 2) 从回复里挑出工具调用单；一张都没有 => 模型想收工，Stop 钩子有权否决
         tool_calls = [
             block for block in response.content if block.type == "tool_use"
         ]
         if not tool_calls:
+            force = trigger_hooks("Stop", messages)
+            if force:
+                # 有钩子反对收工：把它的意见作为新任务塞回去，循环继续
+                messages.append({"role": "user", "content": force})
+                continue
             return
 
-        # 3) 过闸：三道权限检查通过才轮到分发表；被拒则把拒绝话术交回模型
+        # 3) 过闸改走钩子：PreToolUse 拦截 -> 查表执行 -> PostToolUse 旁观
         results = []
         for block in tool_calls:
             print(f"\033[36m> {block.name}\033[0m")
-            if not check_permission(block):
+            blocked = trigger_hooks("PreToolUse", block)
+            if blocked:
                 results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": "Permission denied.",
+                    "content": str(blocked),
                 })
                 continue
             handler = TOOL_HANDLERS.get(block.name)
             output = handler(**block.input) if handler else f"Unknown: {block.name}"
             print(str(output)[:200])
+
+            trigger_hooks("PostToolUse", block, output)
+
             results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,

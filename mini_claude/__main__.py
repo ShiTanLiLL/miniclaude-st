@@ -2,9 +2,11 @@
 
 你在终端里一问一答的体验由这里提供；
 真正的核心逻辑在 loop.py 的 agent_loop 里。
+第 4 课起，你的输入在进循环前会先过一轮 UserPromptSubmit 钩子。
 """
 
 from . import llm
+from .hooks import trigger_hooks
 from .loop import agent_loop
 
 
@@ -37,6 +39,7 @@ def main() -> None:
             client = llm.get_client()
             model = llm.get_model()
 
+        trigger_hooks("UserPromptSubmit", query)
         history.append({"role": "user", "content": query})
         agent_loop(history, client, model)
         print_last_reply(history)

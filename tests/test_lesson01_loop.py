@@ -43,7 +43,7 @@ def test_bash_tool_roundtrip():
 
 
 def test_dangerous_command_blocked():
-    """危险命令在权限闸就被拦下，模型收到统一的拒绝话术（第 3 课起）。"""
+    """危险命令在 PreToolUse 钩子就被拦下，具体拒绝原因回传模型（第 4 课起）。"""
     client = FakeClient([
         tool_response("bash", {"command": "rm -rf /"}),
         text_response("好吧，那我换个安全的方式"),
@@ -52,7 +52,7 @@ def test_dangerous_command_blocked():
 
     agent_loop(messages, client, "fake-model")
 
-    assert messages[2]["content"][0]["content"] == "Permission denied."
+    assert messages[2]["content"][0]["content"] == "Blocked: 'rm -rf /' is on the deny list"
 
 
 def test_run_bash_direct():

@@ -72,10 +72,14 @@ def test_check_permission_ask_flow(monkeypatch):
 # ---------- 在循环里 ----------
 
 def test_loop_denied_command_not_executed(tmp_path, monkeypatch):
-    """rm 命令被第三道闸拦下：文件安然无恙，模型收到拒绝话术。"""
+    """rm 命令被第三道闸拦下：文件安然无恙，模型收到拒绝话术。
+
+    （第 4 课起循环走 PreToolUse 钩子，钩子内部直接问 input，
+    所以这里模拟的是"你在键盘上敲了 n"。）
+    """
     monkeypatch.setattr(tools, "WORKDIR", tmp_path)
     (tmp_path / "old.txt").write_text("珍贵数据")
-    monkeypatch.setattr(permission, "ask_user", lambda *a: "deny")
+    monkeypatch.setattr("builtins.input", lambda *a: "n")
 
     client = FakeClient([
         tool_response("bash", {"command": "rm old.txt"}),
@@ -85,7 +89,7 @@ def test_loop_denied_command_not_executed(tmp_path, monkeypatch):
 
     agent_loop(messages, client, "fake-model")
 
-    assert messages[2]["content"][0]["content"] == "Permission denied."
+    assert messages[2]["content"][0]["content"] == "Permission denied by user"
     assert (tmp_path / "old.txt").read_text() == "珍贵数据"  # 命令没有真的执行
 
 
