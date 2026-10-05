@@ -1,15 +1,17 @@
 """Agent Loop——整个项目唯一的主干道。
 
 第 1 课：一个 bash 工具，循环里硬编码调用 run_bash。
-第 2 课：工具搬进 tools.py，循环改成查 TOOL_HANDLERS 分发——
-工具从 1 个变 5 个，本循环只改了"执行工具"的那一行。
+第 2 课：工具搬进 tools.py，循环改成查 TOOL_HANDLERS 分发。
+第 3 课：执行工具前先过 check_permission 三道闸——循环里只加了一个 if。
 """
 
+from .permission import check_permission
 from .tools import TOOLS, TOOL_HANDLERS, WORKDIR
 
 SYSTEM = (
     f"You are a coding agent. Workspace: {WORKDIR}. "
-    "Use the available tools to solve tasks. Act, don't explain."
+    "Use the available tools to solve tasks. Act, don't explain. "
+    "All destructive operations require user approval."
 )
 
 
@@ -35,10 +37,17 @@ def agent_loop(messages: list, client, model: str) -> None:
         if not tool_calls:
             return
 
-        # 3) 查分发表，替模型执行每一张调用单
+        # 3) 过闸：三道权限检查通过才轮到分发表；被拒则把拒绝话术交回模型
         results = []
         for block in tool_calls:
-            print(f"\033[33m> {block.name}\033[0m")
+            print(f"\033[36m> {block.name}\033[0m")
+            if not check_permission(block):
+                results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": "Permission denied.",
+                })
+                continue
             handler = TOOL_HANDLERS.get(block.name)
             output = handler(**block.input) if handler else f"Unknown: {block.name}"
             print(str(output)[:200])

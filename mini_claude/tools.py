@@ -22,10 +22,7 @@ def safe_path(p: str) -> Path:
 
 
 def run_bash(command: str) -> str:
-    """执行 shell 命令。危险清单检查在第 3 课会搬进正式的权限系统。"""
-    dangerous = ["rm -rf /", "sudo", "shutdown", "reboot", "> /dev/"]
-    if any(d in command for d in dangerous):
-        return "Error: Dangerous command blocked"
+    """执行 shell 命令。危险命令的拦截自第 3 课起由权限系统负责。"""
     try:
         r = subprocess.run(command, shell=True, cwd=WORKDIR,
                            capture_output=True, text=True, errors="replace",

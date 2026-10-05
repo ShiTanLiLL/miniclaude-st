@@ -43,7 +43,7 @@ def test_bash_tool_roundtrip():
 
 
 def test_dangerous_command_blocked():
-    """危险命令不会真的执行，拦截信息作为 tool_result 交回模型。"""
+    """危险命令在权限闸就被拦下，模型收到统一的拒绝话术（第 3 课起）。"""
     client = FakeClient([
         tool_response("bash", {"command": "rm -rf /"}),
         text_response("好吧，那我换个安全的方式"),
@@ -52,11 +52,10 @@ def test_dangerous_command_blocked():
 
     agent_loop(messages, client, "fake-model")
 
-    assert messages[2]["content"][0]["content"] == "Error: Dangerous command blocked"
+    assert messages[2]["content"][0]["content"] == "Permission denied."
 
 
 def test_run_bash_direct():
-    """工具函数本身的行为：正常输出 / 拦截 / 空输出。"""
+    """工具函数本身的行为：正常输出 / 空输出（危险拦截已移交权限系统）。"""
     assert run_bash("echo abc") == "abc"
-    assert run_bash("rm -rf /") == "Error: Dangerous command blocked"
     assert run_bash("true") == "(no output)"
