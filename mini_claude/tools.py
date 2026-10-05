@@ -86,7 +86,9 @@ def run_glob(pattern: str) -> str:
         return f"Error: {e}"
 
 
-# -- 说明书清单：模型能看到的全部工具信息，一共五份 --
+# -- 说明书清单：模型能看到的全部工具信息 --
+from . import todo
+
 TOOLS = [
     {"name": "bash", "description": "Run a shell command.",
      "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
@@ -98,10 +100,11 @@ TOOLS = [
      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "old_text": {"type": "string"}, "new_text": {"type": "string"}}, "required": ["path", "old_text", "new_text"]}},
     {"name": "glob", "description": "Find files matching a glob pattern; ** matches recursively.",
      "input_schema": {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}},
+    todo.TODO_TOOL,
 ]
 
 # -- 分发表：工具名 -> 执行函数。循环唯一会查的东西 --
 TOOL_HANDLERS = {
     "bash": run_bash, "read_file": run_read, "write_file": run_write,
-    "edit_file": run_edit, "glob": run_glob,
+    "edit_file": run_edit, "glob": run_glob, "todo_write": todo.run_todo_write,
 }
